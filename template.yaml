@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  callTest
+
+  Sample SAM Template for callTest
+
+Parameters:
+  Vertical:
+    Type: String
+    Default: SPoC
+  TeamName:
+    Type: String
+    Default: SPoC
+  ServiceName:
+    Type: String
+    Default: DashboardAlarmCall
+  Environment:
+    Type: String
+    Default: nonlive
+
+Globals:
+  Function:
+    Timeout: 3
+
+Resources:
+  callTestFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: callTest.lambda_handler
+      Runtime: 'python3.7'
+      CodeUri: ./src
+      MemorySize: 256
+      Timeout: 30
+
+      Environment:
+        Variables:
+          destPhoneNumber: "+491774433305"
+          contactFlowId: "3c20d737-f846-4394-8112-c31814bbde70"
+          instanceId: "682f6015-2a75-4c40-afe9-5c0e4e9e29cc"
+          sourcePhoneNumber: "+4932211121612"
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroup
+        SubnetIds:
+          - !ImportValue {"Fn::Sub": "${Environment}-bootstrap-vpc-SubnetAz1aPrivateId"}
+          - !ImportValue {"Fn::Sub": "${Environment}-bootstrap-vpc-SubnetAz1bPrivateId"}
+          - !ImportValue {"Fn::Sub": "${Environment}-bootstrap-vpc-SubnetAz1cPrivateId"}
+      Policies:
+        Statement:
+          - Effect: Allow
+            Action:
+              - "sts:AssumeRole"
+              - "ec2:CreateNetworkInterface"
+              - "ec2:DescribeNetworkInterfaces"
+              - "ec2:DeleteNetworkInterface"
+              - "logs:CreateLogGroup"
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
+              - "connect:StartOutboundVoiceContact"
+              - "connect:ListInstances"
+            Resource: "*"   
+      
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${Vertical}-${ServiceName}-${Environment}-lambda-internet-access"
+      GroupDescription: "security group to allow the lambda access to the VPC and the internet (using NAT)"
+      VpcId: !ImportValue {"Fn::Sub": "${Environment}-bootstrap-vpc-VPCId"}
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: "tcp"
+          FromPort: 0
+          ToPort: 65535
+          Description: "do allow any outbound tcp traffic"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ServiceName}-${Environment}-lambda-internet-access"
+        - Key: team
+          Value: !Sub "${TeamName}"
+        - Key: vertical
+          Value: !Sub "${Vertical}"
+        - Key: service
+          Value: !Sub "${ServiceName}"
+        - Key: environment
+          Value: !Sub "${Environment}"
+
+      #Tags:
+      #  - "environment:nonlive"
+      #  - "vertical:spoc"
+      #  - "team:spoc"
+      #  - "service:bootstrap"
+      #  - "Name:spoc-nonlive-bootstrap-alb" 
