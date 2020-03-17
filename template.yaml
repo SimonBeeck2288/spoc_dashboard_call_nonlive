@@ -24,7 +24,7 @@ Globals:
     Timeout: 3
 
 Resources:
-  callTestFunction:
+  CallTestFunction:
     Type: 'AWS::Serverless::Function'
     Properties:
       Handler: callTest.lambda_handler
@@ -59,6 +59,7 @@ Resources:
               - "logs:PutLogEvents"
               - "connect:StartOutboundVoiceContact"
               - "connect:ListInstances"
+              - "sns:Publish"
             Resource: "*"   
       
   LambdaSecurityGroup:
@@ -85,9 +86,21 @@ Resources:
         - Key: environment
           Value: !Sub "${Environment}"
 
-      #Tags:
-      #  - "environment:nonlive"
-      #  - "vertical:spoc"
-      #  - "team:spoc"
-      #  - "service:bootstrap"
-      #  - "Name:spoc-nonlive-bootstrap-alb" 
+  Trigger:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: !Sub "Trigger ${CallTestFunction}"
+      ScheduleExpression: "rate(5 minutes)"
+      State: ENABLED
+      Targets:
+        -
+          Arn: !GetAtt CallTestFunction.Arn
+          Id: TriggerFunction
+
+  TriggerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref CallTestFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt Trigger.Arn
